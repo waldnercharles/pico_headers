@@ -156,6 +156,7 @@ static ecs_ret_t ecs_mt_system(ecs_t *ecs,
                                                           : entities_per_task;
 
     // Create a copy of ecs_mt with thread-specific thread_id
+    task_contexts[num_tasks].system_cb = ctx->system_cb;
     task_contexts[num_tasks].ecs_mt = *ecs_mt;
     task_contexts[num_tasks].ecs_mt.thread_id = num_tasks + 1;
     task_contexts[num_tasks].entities = entities + i;
