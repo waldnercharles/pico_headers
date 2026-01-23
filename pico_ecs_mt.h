@@ -458,9 +458,8 @@ ecs_entity_t ecs_mt_create(ecs_mt_t *ecs_mt)
     ECS_ASSERT(ecs_mt);
     ECS_ASSERT(ecs_mt->thread_id > 0 && ecs_mt->thread_id <= ecs_mt->task_count);
 
-    /* Pre-allocate entity ID using the underlying ECS (thread-safe with atomic ops) */
     /* For now, we use ecs_create directly - this needs to be made thread-safe */
-    /* TODO: Add atomic operations for thread-safe entity ID allocation */
+    /* TODO: Add atomic operations for thread-safe entity ID allocation? */
     ecs_entity_t entity = ecs_create(ecs_mt->ecs);
 
     /* Queue the creation command */
