@@ -16,6 +16,9 @@ all: example
 example: example.o $(DEPS)
 	$(CC) -o example example.o #-g
 
+run: example
+	@./example
+
 clean:
 	rm -f *.o example
 

@@ -129,7 +129,7 @@ int main()
     printf("Creating entities and adding components...\n");
     printf("---------------------------------------------------------------\n");
 
-    int entity_count = 10;
+    int entity_count = 50;
     ecs_entity_t entities[entity_count];
 
     // Create entities with just PosComp
@@ -138,39 +138,27 @@ int main()
         ecs_add(ecs_mt->ecs, entities[i], PosComp, NULL);
     }
 
-    // Add VelComp to half of them
-    for (int i = 5; i < entity_count; i++) {
+    // Add VelComp to two thirds of them
+    for (int i = entity_count * 0.33; i < entity_count; i++) {
         ecs_add(ecs_mt->ecs, entities[i], VelComp, NULL);
     }
 
-    // Add RectComp to a quarter of them
-    for (int i = 7; i < entity_count; i++) {
+    // Add RectComp to one third of them
+    for (int i = entity_count * 0.66; i < entity_count; i++) {
         ecs_add(ecs_mt->ecs, entities[i], RectComp, NULL);
     }
 
     // Manually execute the systems
     printf("Executing system 1 (entities with PosComp)\n");
-    ecs_run_system(
-        ecs_mt->ecs,
-        System1,
-        0
-    ); // Should process all 10 entities across 4 tasks
+    ecs_run_system(ecs_mt->ecs, System1, 0);
     printf("\n");
 
     printf("Executing system 2 (entities with PosComp + VelComp)\n");
-    ecs_run_system(
-        ecs_mt->ecs,
-        System2,
-        0
-    ); // Should process entities 5-9 across tasks
+    ecs_run_system(ecs_mt->ecs, System2, 0);
     printf("\n");
 
     printf("Executing system 3 (entities with PosComp + VelComp + RectComp)\n");
-    ecs_run_system(
-        ecs_mt->ecs,
-        System3,
-        0
-    ); // Should process entities 7-9 across tasks
+    ecs_run_system(ecs_mt->ecs, System3, 0);
     printf("\n");
 
     printf("---------------------------------------------------------------\n");
