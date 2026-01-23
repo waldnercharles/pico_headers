@@ -41,32 +41,17 @@ ecs_system_t System3;
 
 // Placeholder task enqueue callback
 // In a real implementation, this would submit the task to a thread pool
-void* enqueue_task(ecs_mt_system_fn task, int start, int count, void* task_udata, void* udata)
+int enqueue_task(int (*fn)(void *), void* fn_args, void* udata)
 {
-    (void)start;
-    (void)count;
-    (void)udata;
-
-    // For this example, we'll just execute the task immediately on the main thread
-    ecs_mt_task_ctx_t* ctx = (ecs_mt_task_ctx_t*)task_udata;
-
-    printf("    [Task %d] Processing %zu entities starting at index %d\n",
-           ctx->ecs_mt.thread_id, ctx->entity_count, start);
-
-    // Execute the task (in a real implementation, this would be done by a worker thread)
-    task(&ctx->ecs_mt, ctx->entities, ctx->entity_count, ctx->user_udata);
-
-    return (void*)(long)ctx->ecs_mt.thread_id;  // Return thread_id as handle
+    fn(fn_args);
+    return 0;
 }
 
 // Placeholder task finish callback
 // In a real implementation, this would wait for the task to complete
-void finish_task(void* user_task, void* udata)
+void finish_task(void* udata)
 {
     (void)udata;
-
-    int thread_id = (int)(long)user_task;
-    printf("    [Task %d] Completed\n", thread_id);
 }
 
 // Register components
@@ -123,7 +108,7 @@ void register_systems(ecs_mt_t* ecs_mt)
 int main()
 {
     // Creates concrete MT ECS instance with 4 parallel tasks
-    ecs_mt_t* ecs_mt = ecs_mt_new(1024, enqueue_task, finish_task, 4, NULL);
+    ecs_mt_t* ecs_mt = ecs_mt_new(1024, enqueue_task, finish_task, NULL, 4, NULL);
 
     // Register components and systems
     register_components(ecs_mt);
