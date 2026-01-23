@@ -1,5 +1,7 @@
 #define PICO_ECS_IMPLEMENTATION
+#define PICO_TPOOL_IMPLEMENTATION
 #include "../pico_ecs_mt.h"
+#include "../pico_tpool.h"
 
 #include <stdio.h>
 
@@ -39,52 +41,54 @@ ecs_system_t System1;
 ecs_system_t System2;
 ecs_system_t System3;
 
-// Placeholder task enqueue callback
-// In a real implementation, this would submit the task to a thread pool
-int enqueue_task(int (*fn)(void *), void* fn_args, void* udata)
+// Task enqueue callback - submits tasks to the thread pool
+int enqueue_task(int (*fn)(void *), void *fn_args, void *udata)
 {
-    fn(fn_args);
-    return 0;
+    tpool_t *pool = (tpool_t *)udata;
+    return tpool_add_work(pool, fn, fn_args);
 }
 
-// Placeholder task finish callback
-// In a real implementation, this would wait for the task to complete
-void finish_task(void* udata)
+// Task finish callback - waits for all tasks to complete
+void finish_task(void *udata)
 {
-    (void)udata;
+    tpool_t *pool = (tpool_t *)udata;
+    tpool_wait(pool);
 }
 
 // Register components
-void register_components(ecs_mt_t* ecs_mt)
+void register_components(ecs_mt_t *ecs_mt)
 {
-    PosComp  = ecs_define_component(ecs_mt->ecs, sizeof(pos_t),  NULL, NULL);
-    VelComp  = ecs_define_component(ecs_mt->ecs, sizeof(vel_t),  NULL, NULL);
+    PosComp = ecs_define_component(ecs_mt->ecs, sizeof(pos_t), NULL, NULL);
+    VelComp = ecs_define_component(ecs_mt->ecs, sizeof(vel_t), NULL, NULL);
     RectComp = ecs_define_component(ecs_mt->ecs, sizeof(rect_t), NULL, NULL);
 }
 
 // Multi-threaded system that prints the entity IDs of entities processed by this task
-ecs_ret_t system_update(ecs_mt_t* ecs_mt,
-                       ecs_entity_t* entities,
-                       size_t entity_count,
-                       void* udata)
+ecs_ret_t system_update(ecs_mt_t *ecs_mt, ecs_entity_t *entities, size_t entity_count, void *udata)
 {
     (void)ecs_mt;
     (void)udata;
 
-    printf("        Thread %d: ", ecs_mt->thread_id);
+    char buffer[1024];
+    int offset = snprintf(buffer, sizeof(buffer), "\tThread %d: ", ecs_mt->thread_id);
 
-    for (size_t i = 0; i < entity_count; i++)
-    {
-        printf("%lu ", entities[i].id);
+    for (size_t i = 0; i < entity_count && offset < (int)sizeof(buffer) - 1; i++) {
+        offset += snprintf(
+            buffer + offset,
+            sizeof(buffer) - offset,
+            "%llu ",
+            entities[i].id
+        );
     }
 
-    printf("\n");
+    snprintf(buffer + offset, sizeof(buffer) - offset, "\n");
+    printf("%s", buffer);
 
     return 0;
 }
 
 // Register all systems and required relationships
-void register_systems(ecs_mt_t* ecs_mt)
+void register_systems(ecs_mt_t *ecs_mt)
 {
     // Register systems
     System1 = ecs_mt_define_system(ecs_mt, 0, system_update, NULL, NULL, NULL);
@@ -104,11 +108,17 @@ void register_systems(ecs_mt_t* ecs_mt)
     ecs_require_component(ecs_mt->ecs, System3, RectComp);
 }
 
-
 int main()
 {
+    // Create thread pool with 4 worker threads
+    tpool_t *pool = tpool_create(4);
+    if (!pool) {
+        fprintf(stderr, "Failed to create thread pool\n");
+        return 1;
+    }
+
     // Creates concrete MT ECS instance with 4 parallel tasks
-    ecs_mt_t* ecs_mt = ecs_mt_new(1024, enqueue_task, finish_task, NULL, 4, NULL);
+    ecs_mt_t *ecs_mt = ecs_mt_new(1024, enqueue_task, finish_task, pool, 4, NULL);
 
     // Register components and systems
     register_components(ecs_mt);
@@ -119,45 +129,54 @@ int main()
     printf("Creating entities and adding components...\n");
     printf("---------------------------------------------------------------\n");
 
-    ecs_entity_t entities[10];
+    int entity_count = 10;
+    ecs_entity_t entities[entity_count];
 
     // Create entities with just PosComp
-    for (int i = 0; i < 10; i++)
-    {
+    for (int i = 0; i < entity_count; i++) {
         entities[i] = ecs_create(ecs_mt->ecs);
         ecs_add(ecs_mt->ecs, entities[i], PosComp, NULL);
     }
 
     // Add VelComp to half of them
-    for (int i = 5; i < 10; i++)
-    {
+    for (int i = 5; i < entity_count; i++) {
         ecs_add(ecs_mt->ecs, entities[i], VelComp, NULL);
     }
 
     // Add RectComp to a quarter of them
-    for (int i = 7; i < 10; i++)
-    {
+    for (int i = 7; i < entity_count; i++) {
         ecs_add(ecs_mt->ecs, entities[i], RectComp, NULL);
     }
 
-    printf("---------------------------------------------------------------\n");
-
     // Manually execute the systems
     printf("Executing system 1 (entities with PosComp)\n");
-    ecs_run_system(ecs_mt->ecs, System1, 0); // Should process all 10 entities across 4 tasks
+    ecs_run_system(
+        ecs_mt->ecs,
+        System1,
+        0
+    ); // Should process all 10 entities across 4 tasks
     printf("\n");
 
     printf("Executing system 2 (entities with PosComp + VelComp)\n");
-    ecs_run_system(ecs_mt->ecs, System2, 0); // Should process entities 5-9 across tasks
+    ecs_run_system(
+        ecs_mt->ecs,
+        System2,
+        0
+    ); // Should process entities 5-9 across tasks
     printf("\n");
 
     printf("Executing system 3 (entities with PosComp + VelComp + RectComp)\n");
-    ecs_run_system(ecs_mt->ecs, System3, 0); // Should process entities 7-9 across tasks
+    ecs_run_system(
+        ecs_mt->ecs,
+        System3,
+        0
+    ); // Should process entities 7-9 across tasks
     printf("\n");
 
     printf("---------------------------------------------------------------\n");
 
     ecs_mt_free(ecs_mt);
+    tpool_destroy(pool);
 
     return 0;
 }
