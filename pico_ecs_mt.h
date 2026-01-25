@@ -144,8 +144,9 @@ ecs_ret_t ecs_mt_remove(ecs_mt_t *ecs, ecs_entity_t entity, ecs_comp_t component
 
 #ifdef PICO_ECS_IMPLEMENTATION
 
-#include <stdlib.h> // malloc, realloc, free
-#include <string.h> // memset, memcpy
+#include <stdatomic.h> // C11 atomics for lock-free operations
+#include <stdlib.h>    // malloc, realloc, free
+#include <string.h>    // memset, memcpy
 
 /**
  * @brief Command type for deferred operations
